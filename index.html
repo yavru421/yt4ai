@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT_4_AI - YouTube Content Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #3b82f6;
+            --accent-color: #60a5fa;
+            --bg-color: #f8fafc;
+            --text-color: #0f172a;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 2rem;
+        }
+        
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 1.5rem;
+            border: none;
+        }
+        
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 10px 10px 0 0 !important;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 1rem auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .video-thumbnail {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        
+        #videoInfo, #errorMessage {
+            display: none;
+        }
+        
+        .transcript-container {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #f1f5f9;
+            border-radius: 8px;
+        }
+        
+        .meta-item {
+            margin-bottom: 0.5rem;
+        }
+        
+        .meta-label {
+            font-weight: 600;
+        }
+        
+        .description-text {
+            white-space: pre-line;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <h1>YT_4_AI</h1>
+        <p class="lead">Extract and analyze YouTube video content for AI training</p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">Enter YouTube URL</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="videoUrl" class="form-label">YouTube Video URL:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="videoUrl" 
+                            placeholder="https://www.youtube.com/watch?v=..." 
+                            aria-describedby="urlHelp">
+                        <button class="btn btn-primary" onclick="processVideo()" id="processBtn">
+                            Analyze Video
+                        </button>
+                    </div>
+                    <div class="form-text" id="urlHelp">
+                        Enter the full YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)
+                    </div>
+                </div>
+                <div class="loader" id="loader"></div>
+                <div class="alert alert-danger" role="alert" id="errorMessage"></div>
+            </div>
+        </div>
+        
+        <div class="card" id="videoInfo">
+            <div class="card-header">Video Information</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <img id="videoThumbnail" src="" alt="Video Thumbnail" class="video-thumbnail">
+                    </div>
+                    <div class="col-md-8">
+                        <h4 id="videoTitle"></h4>
+                        <div class="meta-item">
+                            <span class="meta-label">Channel:</span> <span id="videoChannel"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Upload Date:</span> <span id="videoDate"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Duration:</span> <span id="videoDuration"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Views:</span> <span id="videoViews"></span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Likes:</span> <span id="videoLikes"></span>
+                        </div>
+                        <div class="text-success mt-3" id="successMessage"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Description</h5>
+                    <div class="description-text" id="videoDescription"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function processVideo() {
+            const videoUrl = document.getElementById("videoUrl").value.trim();
+            const processBtn = document.getElementById("processBtn");
+            const loader = document.getElementById("loader");
+            const errorMessage = document.getElementById("errorMessage");
+            const videoInfo = document.getElementById("videoInfo");
+            
+            // Reset UI
+            errorMessage.style.display = "none";
+            videoInfo.style.display = "none";
+            
+            // Validate input
+            if (!videoUrl) {
+                errorMessage.innerText = "Please enter a YouTube URL";
+                errorMessage.style.display = "block";
+                return;
+            }
+            
+            // YouTube URL pattern validation
+            const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+            if (!youtubeRegex.test(videoUrl)) {
+                errorMessage.innerText = "Please enter a valid YouTube URL";
+                errorMessage.style.display = "block";
+                return;
+            }
+
+            // Show loading state
+            processBtn.disabled = true;
+            loader.style.display = "block";
+
+            try {
+                const response = await fetch("/process", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ video_url: videoUrl })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayVideoData(data);
+                } else {
+                    errorMessage.innerText = data.error || "An error occurred while processing the video";
+                    errorMessage.style.display = "block";
+                }
+            } catch (error) {
+                errorMessage.innerText = "Network error. Please try again later.";
+                errorMessage.style.display = "block";
+                console.error("Error:", error);
+            } finally {
+                // Reset UI
+                processBtn.disabled = false;
+                loader.style.display = "none";
+            }
+        }
+        
+        function displayVideoData(data) {
+            const metadata = data.metadata;
+            
+            // Update video information
+            document.getElementById("videoTitle").innerText = metadata.title;
+            document.getElementById("videoChannel").innerText = metadata.channel;
+            document.getElementById("videoDate").innerText = formatDate(metadata.upload_date);
+            document.getElementById("videoDuration").innerText = formatDuration(metadata.duration);
+            document.getElementById("videoViews").innerText = formatNumber(metadata.views);
+            document.getElementById("videoLikes").innerText = formatNumber(metadata.likes);
+            document.getElementById("videoDescription").innerText = metadata.description;
+            
+            // Set thumbnail if available
+            if (metadata.thumbnail) {
+                document.getElementById("videoThumbnail").src = metadata.thumbnail;
+            }
+            
+            // Show success message
+            document.getElementById("successMessage").innerText = data.message;
+            
+            // Display the video info section
+            document.getElementById("videoInfo").style.display = "block";
+        }
+        
+        function formatDate(dateStr) {
+            if (!dateStr) return "Unknown";
+            // Format YYYYMMDD to YYYY-MM-DD
+            return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+        }
+        
+        function formatDuration(seconds) {
+            if (!seconds) return "Unknown";
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            return `${hours > 0 ? hours + 'h ' : ''}${minutes}m ${secs}s`;
+        }
+        
+        function formatNumber(num) {
+            if (!num) return "Unknown";
+            return new Intl.NumberFormat().format(num);
+        }
+        
+        // Add keyboard event listener for enter key
+        document.getElementById("videoUrl").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                processVideo();
+            }
+        });
+    </script>
+</body>
+</html>
